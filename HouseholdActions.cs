@@ -1,97 +1,113 @@
 using System;
+using System.Linq;
 using System.IO;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using PetSync.Models;
 
 namespace PetSync.Actions
 {
   public static class HouseholdActions
   {
-    private static readonly List<Household> households = new List<Household>();
+    private static Household household =
+      new Household() {
+        name = "Cassidy",
+        users = new List<User> {
+          new User() {
+            name = "Brett"
+          },
+          new User() {
+            name = "AnDrea"
+          },
+          new User() {
+            name = "Eric"
+          }
+        },
+        pets = new List<Pet> {
+          new Pet() {
+            name = "Mira"
+          },
+          new Pet() {
+            name = "Zoe"
+          },
+          new Pet() {
+            name = "Maya"
+          },
+          new Pet() {
+            name = "Mylo"
+          },
+          new Pet() {
+            name = "Oliver"
+          },
+          new Pet() {
+            name = "Fish"
+          }
+        }
+    };
 
-    [FunctionName("NewHousehold")]
-    public static async Task<IActionResult> CreateHousehold(
-      [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)]HttpRequest req, ILogger log)
-    {
-      var household = new Household() { name = "Cassidy" };
-      households.Add(household);
-      return new OkObjectResult(household);
-    }
-
-    [FunctionName("NewUser")]
-    public static async Task<IActionResult> NewUser(
-      [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)]HttpRequest req, ILogger log)
-    {
-      var user = new User() { name = "Eric" };
-      if (households.Count == 1)
-      {
-        households[0].users.Add(user);
-      }
-      return new OkObjectResult(user);
-    }
-
-    [FunctionName("NewPet")]
-    public static async Task<IActionResult> NewPet(
-      [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)]HttpRequest req, ILogger log)
-    {
-      var pet = new Pet() { name = "Zoe" };
-      if (households.Count == 1)
-      {
-        households[0].pets.Add(pet);
-      }
-      return new OkObjectResult(pet);
-    }
-
-    [FunctionName("GivePetFood")]
-    public static async Task<IActionResult> GivePetFood(
-      [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)]HttpRequest req, ILogger log)
+    [FunctionName("FeedPet")]
+    public static IActionResult FeedPet(
+      [HttpTrigger(AuthorizationLevel.Function, "post", Route = "feed/{pet_id}")]HttpRequest req, ILogger log, string pet_id)
     {
       var feedEvent = new FeedEvent() {
         amount = 1,
         um = "cup"
       };
-      if (households.Count == 1 && households[0].pets.Count > 0)
+      if (household.pets.Count > 0)
       {
-        var pet = households[0].pets[0];
-        pet.events.Add(feedEvent);
+        var pet = household.pets.FirstOrDefault(x => x.id == Guid.Parse(pet_id));
+        if (pet != null)
+        {
+          pet.events.Add(feedEvent);
+        }
+        else
+        {
+          return new NotFoundObjectResult("No pet with id = " + pet_id + " found!");
+        }
       }
       return new OkObjectResult(feedEvent);
     }
 
     [FunctionName("GivePetSupplement")]
-    public static async Task<IActionResult> GivePetSupplement(
-      [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)]HttpRequest req, ILogger log)
+    public static IActionResult GivePetSupplement(
+      [HttpTrigger(AuthorizationLevel.Function, "post", Route = "supplement/{pet_id}")]HttpRequest req, ILogger log, string pet_id)
     {
-      var feedEvent = new FeedEvent() {
+      var supplementEvent = new FeedEvent() {
         name = "Supplement",
         amount = 1,
         um = ""
       };
-      if (households.Count == 1 && households[0].pets.Count > 0)
+      if (household.pets.Count > 0)
       {
-        var pet = households[0].pets[0];
-        pet.events.Add(feedEvent);
+        var pet = household.pets.FirstOrDefault(x => x.id == Guid.Parse(pet_id));
+        if (pet != null) {
+          pet.events.Add(supplementEvent);
+        }
+        else
+        {
+          return new NotFoundObjectResult("No pet with id = " + pet_id + " found!");
+        }
       }
-      return new OkObjectResult(feedEvent);
+      return new OkObjectResult(supplementEvent);
     }
 
     [FunctionName("GetHousehold")]
-    public static async Task<IActionResult> GetHousehold(
-      [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)]HttpRequest req, ILogger log)
+    public static IActionResult GetHousehold(
+      [HttpTrigger(AuthorizationLevel.Function, "get", Route = null)]HttpRequest req, ILogger log)
     {
-      var household = new Household();
-      if (households.Count == 1)
-      {
-        household = households[0];
-      }
       return new OkObjectResult(household);
+    }
+
+    public static void ClearEvents()
+    {
+      foreach (Pet pet in household.pets)
+      {
+        pet.events = new List<Event>();
+      }
     }
   }
 }
